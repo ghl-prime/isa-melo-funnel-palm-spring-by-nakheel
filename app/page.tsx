@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { withBasePath } from '../lib/base-path'
@@ -15,6 +15,7 @@ declare global {
 const CONFIG = {
   agentName: 'Isadora Melo',
   whatsappNumber: '971504793112',
+  ghlWebhookUrl: 'https://services.leadconnectorhq.com/hooks/iGbC817rCzAfj7HtPYRs/webhook-trigger/OLjYU2M7uy4NrhraIdkq',
   redirectUrl: '',             // GHL page after form (empty = open WhatsApp)
   redirectSeconds: 6,
 }
@@ -450,7 +451,16 @@ export default function Page() {
     const payload = {
       source: 'palm-springs-lp',
       project: 'Palm Springs by Nakheel',
-      language: lang,
+      language: ({ en: 'English', pt: 'Portuguese', es: 'Spanish' } as Record<Lang, string>)[lang],
+      language_code: lang,
+      first_name: answers.first_name,
+      last_name: answers.last_name,
+      full_name: `${answers.first_name || ''} ${answers.last_name || ''}`.trim(),
+      email: answers.email,
+      phone: fullPhone,
+      country_code: answers.country_code || defaultCode,
+      looking_for: answers.looking,
+      unit_size: answers.size,
       submittedAt: new Date().toISOString(),
       answers: {
         first: answers.first_name || '',
@@ -467,14 +477,25 @@ export default function Page() {
       ...utm,
     }
 
+    const clean = (value: unknown): unknown => {
+      if (typeof value === 'string') return value.trim() || undefined
+      if (Array.isArray(value)) return value.map(clean).filter(item => item !== undefined)
+      if (value && typeof value === 'object') {
+        const entries = Object.entries(value).map(([key, item]) => [key, clean(item)] as const).filter(([, item]) => item !== undefined)
+        return entries.length ? Object.fromEntries(entries) : undefined
+      }
+      return value == null ? undefined : value
+    }
+
     try {
-      /* Send to the Next.js API route (GHL + Meta CAPI) */
-      const response = await fetch('/api/lead', {
+      // A simple cross-origin request avoids requiring CORS headers on the webhook.
+      // The opaque response cannot confirm whether the webhook accepted the lead.
+      await fetch(CONFIG.ghlWebhookUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(clean(payload)),
       })
-      if (!response.ok) throw new Error('Lead delivery failed')
 
       window.fbq?.('track', 'Lead', { content_name: 'palm-springs-lp', currency: 'AED' }, { eventID: eventId })
       setDone(true)
