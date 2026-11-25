@@ -425,7 +425,7 @@ export default function Page() {
     }[lang]
     const options: Record<string, string> = copy.options
     const lines = [`${copy.greeting}, ${CONFIG.agentName}${lang === 'es' ? ':' : ','}`, '', copy.intro, '']
-    const add = (label: string, value?: string) => { if (value?.trim()) lines.push(`? ${label}: ${value.trim()}`) }
+    const add = (label: string, value?: string) => { if (value?.trim()) lines.push(`. ${label}: ${value.trim()}`) }
     add(copy.name, name)
     add(copy.email, answers.email)
     add(copy.phone, answers.phone_local?.trim() ? phone : '')
