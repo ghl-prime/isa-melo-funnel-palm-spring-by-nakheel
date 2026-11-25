@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
 
-const GO_HIGH_LEVEL_WEBHOOK = 'https://services.leadconnectorhq.com/hooks/iGbC817rCzAfj7HtPYRs/webhook-trigger/acb94afa-4246-416c-a726-9c048def03d9'
+const GO_HIGH_LEVEL_WEBHOOK = 'https://services.leadconnectorhq.com/hooks/iGbC817rCzAfj7HtPYRs/webhook-trigger/OLjYU2M7uy4NrhraIdkq'
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID
 const META_CAPI_TOKEN = process.env.META_CONVERSIONS_API_TOKEN
 
@@ -60,10 +60,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid lead payload' }, { status: 400 })
     }
 
+    const answers = payload.answers as Record<string, string>
+    const clean = (value: unknown): unknown => {
+      if (typeof value === 'string') return value.trim() || undefined
+      if (Array.isArray(value)) return value.map(clean).filter(item => item !== undefined)
+      if (value && typeof value === 'object') {
+        const entries = Object.entries(value).map(([key, item]) => [key, clean(item)] as const).filter(([, item]) => item !== undefined)
+        return entries.length ? Object.fromEntries(entries) : undefined
+      }
+      return value == null ? undefined : value
+    }
+    const webhookPayload = clean({
+      ...payload,
+      first_name: answers.first,
+      last_name: answers.last,
+      full_name: [answers.first, answers.last].filter(Boolean).join(' '),
+      email: answers.email,
+      phone: answers.phone,
+      country_code: answers.phoneCode,
+      looking_for: answers.looking,
+      unit_size: answers.size,
+      language: ({ en: 'English', pt: 'Portuguese', es: 'Spanish' } as Record<string, string>)[payload.language] || payload.language,
+      language_code: payload.language,
+    })
+
     const response = await fetch(GO_HIGH_LEVEL_WEBHOOK, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(webhookPayload),
       cache: 'no-store',
     })
 

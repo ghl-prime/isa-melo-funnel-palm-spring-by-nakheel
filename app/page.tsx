@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { withBasePath } from '../lib/base-path'
@@ -15,7 +15,6 @@ declare global {
 const CONFIG = {
   agentName: 'Isadora Melo',
   whatsappNumber: '971504793112',
-  ghlWebhookUrl: 'https://services.leadconnectorhq.com/hooks/iGbC817rCzAfj7HtPYRs/webhook-trigger/OLjYU2M7uy4NrhraIdkq',
   redirectUrl: '',             // GHL page after form (empty = open WhatsApp)
   redirectSeconds: 6,
 }
@@ -84,7 +83,7 @@ const T = {
     o: { 'Townhouse, 3 to 4 bedrooms': 'Townhouses', 'Villa, 4 to 5 bedrooms': 'Villas', 'Apartment': 'Apartment', 'Studio': 'Studio', 'One bedroom': 'One bed', 'Two bedrooms': 'Two bed', 'More': 'More' } as Record<string, string>,
     sub: { 'Townhouse, 3 to 4 bedrooms': '3 to 4 bedroom', 'Villa, 4 to 5 bedrooms': '4 to 5 bedroom' } as Record<string, string>,
     f: { first: 'First name', last: 'Last name', email: 'Email', phone: 'WhatsApp number', firstPh: 'First name', lastPh: 'Last name', emailPh: 'you@example.com', phonePh: '50 123 4567' },
-    b: { back: 'Back', submit: 'Get my shortlist', sending: 'Sending…', wa: 'Continue on WhatsApp', go: 'Continue' },
+    b: { back: 'Back', submit: 'Get my shortlist', sending: 'Sending…', wa: 'To finalize, send us a message on WhatsApp', go: 'Continue' },
     e: { first: 'Please enter your first name.', email: 'Please check your email address.', phone: 'Please enter a valid WhatsApp number.' },
     consent: 'Used only to prepare and send your Palm Springs shortlist. No cold calls, never shared with third parties.',
     stepOf: 'Step {n} of {t}',
@@ -145,7 +144,7 @@ const T = {
     o: { 'Townhouse, 3 to 4 bedrooms': 'Townhouses', 'Villa, 4 to 5 bedrooms': 'Villas', 'Apartment': 'Apartamento', 'Studio': 'Studio', 'One bedroom': '1 quarto', 'Two bedrooms': '2 quartos', 'More': 'Mais' } as Record<string, string>,
     sub: { 'Townhouse, 3 to 4 bedrooms': '3 a 4 quartos', 'Villa, 4 to 5 bedrooms': '4 a 5 quartos' } as Record<string, string>,
     f: { first: 'Nome', last: 'Sobrenome', email: 'E-mail', phone: 'Número de WhatsApp', firstPh: 'Nome', lastPh: 'Sobrenome', emailPh: 'voce@exemplo.com', phonePh: '11 91234 5678' },
-    b: { back: 'Voltar', submit: 'Quero minha seleção', sending: 'Enviando…', wa: 'Continuar no WhatsApp', go: 'Continuar' },
+    b: { back: 'Voltar', submit: 'Quero minha seleção', sending: 'Enviando…', wa: 'Para finalizar, envie uma mensagem no WhatsApp', go: 'Continuar' },
     e: { first: 'Digite o seu nome.', email: 'Confira o seu e-mail.', phone: 'Digite um número de WhatsApp válido.' },
     consent: 'Usado apenas para preparar e enviar a sua seleção do Palm Springs. Sem ligação de vendedor e sem compartilhar com terceiros.',
     stepOf: 'Passo {n} de {t}',
@@ -206,7 +205,7 @@ const T = {
     o: { 'Townhouse, 3 to 4 bedrooms': 'Townhouses', 'Villa, 4 to 5 bedrooms': 'Villas', 'Apartment': 'Apartamento', 'Studio': 'Estudio', 'One bedroom': '1 habitación', 'Two bedrooms': '2 habitaciones', 'More': 'Más' } as Record<string, string>,
     sub: { 'Townhouse, 3 to 4 bedrooms': '3 a 4 habitaciones', 'Villa, 4 to 5 bedrooms': '4 a 5 habitaciones' } as Record<string, string>,
     f: { first: 'Nombre', last: 'Apellido', email: 'Correo electrónico', phone: 'Número de WhatsApp', firstPh: 'Nombre', lastPh: 'Apellido', emailPh: 'tu@ejemplo.com', phonePh: '612 34 56 78' },
-    b: { back: 'Atrás', submit: 'Quiero mi selección', sending: 'Enviando…', wa: 'Continuar en WhatsApp', go: 'Continuar' },
+    b: { back: 'Atrás', submit: 'Quiero mi selección', sending: 'Enviando…', wa: 'Para finalizar, env?anos un mensaje por WhatsApp', go: 'Continuar' },
     e: { first: 'Escribe tu nombre.', email: 'Revisa tu correo electrónico.', phone: 'Escribe un número de WhatsApp válido.' },
     consent: 'Se usa solo para preparar y enviar tu selección de Palm Springs. Sin llamadas de venta y sin compartir con terceros.',
     stepOf: 'Paso {n} de {t}',
@@ -417,18 +416,22 @@ export default function Page() {
 
   const waLink = () => {
     const name = `${answers.first_name || ''} ${answers.last_name || ''}`.trim()
-    const lines = [
-      `Hi ${CONFIG.agentName}, I just registered for Palm Springs by Nakheel.`,
-      '',
-      `Name: ${name}`,
-      `Looking for: ${answers.looking || ''}`,
-    ]
-    if (answers.size) lines.push(`Size: ${answers.size}`)
-    lines.push(
-      `Preferred language: ${({ pt: 'Portuguese', es: 'Spanish' } as Record<string, string>)[lang] || 'English'}`,
-      '',
-      'Please send the unit list and the payment plan.',
-    )
+    const phone = (answers.country_code || defaultCode) + (answers.phone_local || '').replace(/\D/g, '').replace(/^0+/, '')
+    const copy = {
+      en: { greeting: 'Hello', intro: 'I just completed your questionnaire about Palm Springs by Nakheel and would like to learn more about the options available to me.', name: 'Name', email: 'Email', phone: 'WhatsApp number', looking: 'Looking for', size: 'Size', language: 'Preferred language', languageValue: 'English', close: 'Could we schedule a brief conversation at your convenience to review my personalized selection?', thanks: 'Thank you', options: { 'Townhouse, 3 to 4 bedrooms': 'Townhouse, 3 to 4 bedrooms', 'Villa, 4 to 5 bedrooms': 'Villa, 4 to 5 bedrooms', Apartment: 'Apartment', Studio: 'Studio', 'One bedroom': '1 bedroom', 'Two bedrooms': '2 bedrooms', More: 'More' } },
+      pt: { greeting: 'Ol?', intro: 'Acabei de responder ao seu question?rio sobre o Palm Springs by Nakheel e gostaria de saber mais sobre as op??es dispon?veis para mim.', name: 'Nome', email: 'E-mail', phone: 'N?mero do WhatsApp', looking: 'Procuro', size: 'Tamanho', language: 'Idioma preferido', languageValue: 'Portugu?s', close: 'Poder?amos agendar uma breve conversa, quando for conveniente para voc?, para revisar minha sele??o personalizada?', thanks: 'Obrigado(a)', options: { 'Townhouse, 3 to 4 bedrooms': 'Townhouse, de 3 a 4 quartos', 'Villa, 4 to 5 bedrooms': 'Villa, de 4 a 5 quartos', Apartment: 'Apartamento', Studio: 'Studio', 'One bedroom': '1 quarto', 'Two bedrooms': '2 quartos', More: 'Mais' } },
+      es: { greeting: 'Hola', intro: 'Acabo de completar tu cuestionario sobre Palm Springs by Nakheel y me gustar?a conocer m?s sobre las opciones disponibles para m?.', name: 'Nombre', email: 'Correo electr?nico', phone: 'N?mero de WhatsApp', looking: 'Busco', size: 'Tama?o', language: 'Idioma preferido', languageValue: 'Espa?ol', close: '?Podr?amos programar una breve conversaci?n, cuando te venga bien, para revisar mi selecci?n personalizada?', thanks: 'Gracias', options: { 'Townhouse, 3 to 4 bedrooms': 'Townhouse, de 3 a 4 habitaciones', 'Villa, 4 to 5 bedrooms': 'Villa, de 4 a 5 habitaciones', Apartment: 'Apartamento', Studio: 'Estudio', 'One bedroom': '1 habitaci?n', 'Two bedrooms': '2 habitaciones', More: 'M?s' } },
+    }[lang]
+    const options: Record<string, string> = copy.options
+    const lines = [`${copy.greeting}, ${CONFIG.agentName}${lang === 'es' ? ':' : ','}`, '', copy.intro, '']
+    const add = (label: string, value?: string) => { if (value?.trim()) lines.push(`? ${label}: ${value.trim()}`) }
+    add(copy.name, name)
+    add(copy.email, answers.email)
+    add(copy.phone, answers.phone_local?.trim() ? phone : '')
+    add(copy.looking, options[answers.looking] || answers.looking)
+    add(copy.size, options[answers.size] || answers.size)
+    add(copy.language, copy.languageValue)
+    lines.push('', copy.close, '', `${copy.thanks},`, name)
     return `https://wa.me/${CONFIG.whatsappNumber}?text=${encodeURIComponent(lines.join('\n'))}`
   }
 
@@ -460,6 +463,7 @@ export default function Page() {
       },
       eventId,
       pageUrl: typeof location !== 'undefined' ? location.href : undefined,
+      referrer: typeof document !== 'undefined' ? document.referrer : undefined,
       ...utm,
     }
 
@@ -471,34 +475,6 @@ export default function Page() {
         body: JSON.stringify(payload),
       })
       if (!response.ok) throw new Error('Lead delivery failed')
-
-      /* Also send directly to GHL webhook if configured */
-      if (CONFIG.ghlWebhookUrl) {
-        const ghlPayload = {
-          first_name: answers.first_name || '',
-          last_name: answers.last_name || '',
-          full_name: `${answers.first_name || ''} ${answers.last_name || ''}`.trim(),
-          email: answers.email || '',
-          phone: fullPhone,
-          country_code: answers.country_code || defaultCode,
-          looking_for: answers.looking || '',
-          unit_size: answers.size || '',
-          language: ({ pt: 'Portuguese', es: 'Spanish' } as Record<string, string>)[lang] || 'English',
-          project: 'Palm Springs by Nakheel',
-          source: 'Palm Springs LP',
-          submitted_at: new Date().toISOString(),
-          page_url: typeof location !== 'undefined' ? location.href : '',
-          referrer: typeof document !== 'undefined' ? document.referrer : '',
-          ...utm,
-        }
-        fetch(CONFIG.ghlWebhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(ghlPayload),
-        }).catch(() => {
-          fetch(CONFIG.ghlWebhookUrl, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(ghlPayload) }).catch(() => { /* swallow */ })
-        })
-      }
 
       window.fbq?.('track', 'Lead', { content_name: 'palm-springs-lp', currency: 'AED' }, { eventID: eventId })
       setDone(true)
@@ -753,7 +729,7 @@ export default function Page() {
                             onClick={() => {
                               setAnswer(currentId, v)
                               if (currentId === 'looking' && v !== 'Apartment') {
-                                setAnswers(a => { const next = { ...a, [currentId]: v }; delete next.size; return next })
+                                setAnswers(a => { const next: Answers = { ...a, [currentId]: v }; delete next.size; return next })
                               }
                               setTimeout(advance, 190)
                             }}
@@ -790,3 +766,4 @@ export default function Page() {
     </>
   )
 }
+
