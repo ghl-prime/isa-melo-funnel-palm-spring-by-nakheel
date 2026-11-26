@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { withBasePath } from '../lib/base-path'
+import { LEAD_FORM_ID } from '../lib/tracking'
 
 declare global {
   interface Window {
+    dataLayer?: unknown[]
     fbq?: (...args: unknown[]) => void
   }
 }
@@ -15,7 +17,6 @@ declare global {
 const CONFIG = {
   agentName: 'Isadora Melo',
   whatsappNumber: '971504793112',
-  ghlWebhookUrl: 'https://services.leadconnectorhq.com/hooks/iGbC817rCzAfj7HtPYRs/webhook-trigger/OLjYU2M7uy4NrhraIdkq',
   redirectUrl: '',             // GHL page after form (empty = open WhatsApp)
   redirectSeconds: 6,
 }
@@ -297,6 +298,7 @@ export default function Page() {
   const [seconds, setSeconds] = useState(CONFIG.redirectSeconds)
   const langWrapRef = useRef<HTMLDivElement>(null)
   const utmRef = useRef<Record<string, string>>({})
+  const submissionLockedRef = useRef(false)
 
   const L = useMemo(() => T[lang], [lang])
 
@@ -439,28 +441,20 @@ export default function Page() {
   const destination = () => CONFIG.redirectUrl || waLink()
 
   const submit = async () => {
-    if (!validate() || submitting) return
+    if (submissionLockedRef.current || !validate()) return
+    submissionLockedRef.current = true
     setSubmitting(true)
     setError('')
 
     const fullPhone = (answers.country_code || defaultCode) + (answers.phone_local || '').replace(/\D/g, '').replace(/^0+/, '')
     const utm: Record<string, string> = {}
     UTM_FIELDS.forEach(key => { utm[key] = utmRef.current[key] ?? '' })
-    const eventId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `lead-${Date.now()}-${Math.random().toString(36).slice(2)}`
 
     const payload = {
-      source: 'palm-springs-lp',
+      source: LEAD_FORM_ID,
       project: 'Palm Springs by Nakheel',
       language: lang,
       language_code: lang,
-      first_name: answers.first_name,
-      last_name: answers.last_name,
-      full_name: `${answers.first_name || ''} ${answers.last_name || ''}`.trim(),
-      email: answers.email,
-      phone: fullPhone,
-      country_code: answers.country_code || defaultCode,
-      looking_for: answers.looking,
-      unit_size: answers.size,
       submittedAt: new Date().toISOString(),
       answers: {
         first: answers.first_name || '',
@@ -471,39 +465,39 @@ export default function Page() {
         looking: answers.looking || '',
         size: answers.size || '',
       },
-      eventId,
       pageUrl: typeof location !== 'undefined' ? location.href : undefined,
       referrer: typeof document !== 'undefined' ? document.referrer : undefined,
       ...utm,
     }
 
-    const clean = (value: unknown): unknown => {
-      if (typeof value === 'string') return value.trim() || undefined
-      if (Array.isArray(value)) return value.map(clean).filter(item => item !== undefined)
-      if (value && typeof value === 'object') {
-        const entries = Object.entries(value).map(([key, item]) => [key, clean(item)] as const).filter(([, item]) => item !== undefined)
-        return entries.length ? Object.fromEntries(entries) : undefined
-      }
-      return value == null ? undefined : value
-    }
-
+    let eventId: string
     try {
-      // A simple cross-origin request avoids requiring CORS headers on the webhook.
-      // The opaque response cannot confirm whether the webhook accepted the lead.
-      await fetch(CONFIG.ghlWebhookUrl, {
+      const response = await fetch(withBasePath('/api/lead'), {
         method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(clean(payload)),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       })
-
-      window.fbq?.('track', 'Lead', { content_name: 'palm-springs-lp', currency: 'AED' }, { eventID: eventId })
-      setDone(true)
+      if (!response.ok) throw new Error('Lead delivery failed')
+      const result = await response.json()
+      if (result?.delivered !== true || typeof result.eventId !== 'string' || !result.eventId) {
+        throw new Error('Lead delivery was not confirmed')
+      }
+      eventId = result.eventId
     } catch {
+      submissionLockedRef.current = false
       setError('We could not submit your details. Please try again.')
+      return
     } finally {
       setSubmitting(false)
     }
+
+    setDone(true)
+    try {
+      (window.dataLayer ??= []).push({ event: 'generate_lead', form_id: LEAD_FORM_ID, event_id: eventId })
+    } catch { /* GTM is independent of lead delivery */ }
+    try {
+      window.fbq?.('track', 'Lead', { content_name: LEAD_FORM_ID, currency: 'AED' }, { eventID: eventId })
+    } catch { /* Meta Pixel is independent of lead delivery */ }
   }
 
   const onWhatsApp = !CONFIG.redirectUrl

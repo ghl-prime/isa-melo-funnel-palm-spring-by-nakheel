@@ -1,10 +1,10 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
-import Script from 'next/script'
+import { withBasePath } from '../lib/base-path'
+import { GTM_CONTAINER_ID, META_PIXEL_ID } from '../lib/tracking'
 import './globals.css'
 
 const siteUrl = 'https://find.isamelorealestate.com/palmsprings'
-const metaPixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -94,6 +94,36 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <script dangerouslySetInnerHTML={{
+          __html: `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','${GTM_CONTAINER_ID}');`,
+        }} />
+        <script dangerouslySetInnerHTML={{
+          __html: `(function() {
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+
+const eventID = Array.from(crypto.getRandomValues(new Uint8Array(16)),
+  byte => byte.toString(16).padStart(2, '0')).join('');
+fetch('${withBasePath('/api/page-view')}', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ eventId: eventID }),
+  keepalive: true
+}).catch(function() {});
+fbq('init', '${META_PIXEL_ID}');
+fbq('track', 'PageView', {}, { eventID: eventID });
+})();`,
+        }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
@@ -102,26 +132,10 @@ export default function RootLayout({
         />
       </head>
       <body>
-        {metaPixelId && (
-          <Script id="meta-pixel" strategy="afterInteractive" dangerouslySetInnerHTML={{
-            __html: `!function(f,b,e,v,n,t,s)
-{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-n.queue=[];t=b.createElement(e);t.async=!0;
-t.src=v;s=b.getElementsByTagName(e)[0];
-s.parentNode.insertBefore(t,s)}(window, document,'script',
-'https://connect.facebook.net/en_US/fbevents.js');
-fbq('init', '${metaPixelId}');
-fbq('track', 'PageView');`,
-          }} />
-        )}
+        <noscript>
+          <iframe title="Google Tag Manager" src={`https://www.googletagmanager.com/ns.html?id=${GTM_CONTAINER_ID}`} height="0" width="0" style={{ display: 'none', visibility: 'hidden' }} />
+        </noscript>
         {children}
-        {metaPixelId && (
-          <noscript>
-            <img height="1" width="1" style={{ display: 'none' }} alt="" src={`https://www.facebook.com/tr?id=${metaPixelId}&ev=PageView&noscript=1`} />
-          </noscript>
-        )}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(agentSchema) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(webSiteSchema) }} />
         {process.env.NODE_ENV === 'production' && <Analytics />}
